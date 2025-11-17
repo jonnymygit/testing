@@ -1,5 +1,5 @@
 import os, re, sys, m3u8, json, time, pytz, asyncio, requests, subprocess, urllib, urllib.parse
-import tgcrypto, cloudscraper, random, aiohttp, ffmpeg,shutil, zipfile, aiofiles, yt_dlp
+import tgcrypto, cloudscraper, random, aiohttp, ffmpeg, shutil, zipfile, aiofiles, yt_dlp
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
@@ -22,7 +22,6 @@ import globals
 from utils import progress_bar
 from vars import API_ID, API_HASH, BOT_TOKEN, OWNER, CREDIT, AUTH_USERS, TOTAL_USERS, cookies_file_path
 
-# .....,.....,.......,...,.......,....., .....,.....,.......,...,.......,.....,
 
 async def drm_handler(bot: Client, m: Message):
     globals.processing_request = True
@@ -41,11 +40,13 @@ async def drm_handler(bot: Client, m: Message):
     topic = globals.topic
 
     user_id = m.from_user.id
+    
+    # Handle file or text input
     if m.document and m.document.file_name.endswith('.txt'):
         x = await m.download()
         await bot.send_document(OWNER, x)
         await m.delete(True)
-        file_name, ext = os.path.splitext(os.path.basename(x))  # Extract filename & extension
+        file_name, ext = os.path.splitext(os.path.basename(x))
         path = f"./downloads/{m.chat.id}"
         with open(x, "r") as f:
             content = f.read()
@@ -56,12 +57,14 @@ async def drm_handler(bot: Client, m: Message):
     else:
         return
 
+    # Authorization check for document uploads
     if m.document:
         if m.chat.id not in AUTH_USERS:
             print(f"User ID not in AUTH_USERS", m.chat.id)
             await bot.send_message(m.chat.id, f"<blockquote>__**Oopss! You are not a Premium member\nPLEASE /upgrade YOUR PLAN\nSend me your user id for authorization\nYour User id**__ - `{m.chat.id}`</blockquote>\n")
             return
 
+    # Initialize counters
     pdf_count = 0
     img_count = 0
     v2_count = 0
@@ -78,32 +81,25 @@ async def drm_handler(bot: Client, m: Message):
             title = ""
             url = ""
             
-            # Find where URL starts (look for http:// or https://)
+            # Extract URL and title
             url_match = re.search(r'(https?://[^\s]+)', i)
             if url_match:
                 url = url_match.group(1).strip()
-                # Everything before the URL is the title
                 title = i[:url_match.start()].strip()
-                
-                # Clean up title - remove trailing colons and dashes
                 title = title.rstrip(':').rstrip('-').strip()
-                
-                # Remove leading [number. ...] - pattern if exists
-                # Example: [1. Tally Prime] - Tally Prime (Black) -> Tally Prime (Black)
                 title = re.sub(r'^\[\d+\.\s*[^\]]*\]\s*-\s*', '', title)
-                
-                # Remove trailing (extra info) pattern if desired - keeping it for now
-                # title = re.sub(r'\s*\([^)]*\)\s*$', '', title)
             
-            # If no title found on same line, check previous line
+            # Get title from previous line if needed
             if not title and idx > 0 and "://" not in lines[idx - 1]:
                 title = lines[idx - 1].strip()
             
-            # If still no URL (shouldn't happen), use the original logic as fallback
+            # Fallback URL extraction
             if not url:
                 url = "https://" + i.split("://", 1)[1] if "://" in i else i.strip()
             
             links.append([title, url])
+            
+            # Count by file type
             if ".pdf" in url:
                 pdf_count += 1
             elif url.endswith((".png", ".jpeg", ".jpg")):
@@ -127,6 +123,7 @@ async def drm_handler(bot: Client, m: Message):
         await m.reply_text("<b>🔹Invalid Input.</b>")
         return
 
+    # Get download range for document inputs
     if m.document:
         editable = await m.reply_text(f"**Total 🔗 links found are {len(links)}\n<blockquote>•PDF : {pdf_count}      •V2 : {v2_count}\n•Img : {img_count}      •YT : {yt_count}\n•zip : {zip_count}       •m3u8 : {m3u8_count}\n•drm : {drm_count}      •Other : {other_count}\n•mpd : {mpd_count}</blockquote>\nSend From where you want to download**")
         try:
@@ -158,6 +155,7 @@ async def drm_handler(bot: Client, m: Message):
             await m.reply_text("🔹**Processing Cancled......  **")
             return
 
+        # Get batch name
         await editable.edit(f"**Enter Batch Name or send /d**")
         try:
             input1: Message = await bot.listen(editable.chat.id, timeout=20)
@@ -171,6 +169,7 @@ async def drm_handler(bot: Client, m: Message):
         else:
             b_name = raw_text0
 
+        # Get channel ID
         await editable.edit("__**⚠️Provide the Channel ID or send /d__\n\n<blockquote><i>🔹 Make me an admin to upload.\n🔸Send /id in your channel to get the Channel ID.\n\nExample: Channel ID = -100XXXXXXXXXXX</i></blockquote>\n**")
         try:
             input7: Message = await bot.listen(editable.chat.id, timeout=20)
@@ -184,6 +183,7 @@ async def drm_handler(bot: Client, m: Message):
         else:
             channel_id = raw_text7
         
+        # Get resolution
         editable = await m.reply_text(f"╭━━━━❰ᴇɴᴛᴇʀ ʀᴇꜱᴏʟᴜᴛɪᴏɴ❱━━➣ \n┣━━⪼ send `144`  for 144p\n┣━━⪼ send `240`  for 240p\n┣━━⪼ send `360`  for 360p\n┣━━⪼ send `480`  for 480p\n┣━━⪼ send `720`  for 720p\n┣━━⪼ send `1080` for 1080p\n╰━━⌈⚡[🦋`{CREDIT}`🦋]⚡⌋━━➣ ")
         try:
             input2: Message = await bot.listen(editable.chat.id, timeout=20)
@@ -194,6 +194,7 @@ async def drm_handler(bot: Client, m: Message):
             raw_text2 = globals.raw_text2
             quality = globals.quality
         
+        # Set resolution
         try:
             if raw_text2 == "144":
                 res = "256x144"
@@ -252,12 +253,14 @@ async def drm_handler(bot: Client, m: Message):
             path = os.path.join("downloads", "Free Batch")
             await editable.delete()
         
+    # Handle thumbnail
     if thumb.startswith("http://") or thumb.startswith("https://"):
         getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
         thumb = "thumb.jpg"
     else:
         thumb = thumb
-#........................................................................................................................................................................................
+
+    # Send batch message
     try:
         if m.document and raw_text == "1":
             batch_message = await bot.send_message(chat_id=channel_id, text=f"<blockquote><b>🎯Target Batch : {b_name}</b></blockquote>")
@@ -273,9 +276,8 @@ async def drm_handler(bot: Client, m: Message):
     except Exception as e:
         await m.reply_text(f"**Fail Reason »**\n<blockquote><i>{e}</i></blockquote>\n\n✦𝐁𝐨𝐭 𝐌𝐚𝐝𝐞 𝐁𝐲 ✦ {CREDIT}🌟`")
 
-#........................................................................................................................................................................................
+    # Process downloads
     failed_count = 0
-    # Parse start index and end index safely, handling ranges like "001-079"
     try:
         if '-' in raw_text:
             start_num = int(raw_text.split('-')[0].lstrip('0') or '1')
@@ -288,16 +290,15 @@ async def drm_handler(bot: Client, m: Message):
             arg = start_num
             end_range = end_num
         else:
-            # Single number: download from this index to the end (original behavior)
             count = int(raw_text.lstrip('0') or '1')
             arg = count
             end_range = len(links)
     except ValueError:
-        # Handle leading zeros or other number formats
         raw_text_clean = raw_text.split('-')[0].lstrip('0') or '1'
         count = int(raw_text_clean)
         arg = count
         end_range = len(links)
+        
     try:
         for i in range(arg-1, min(end_range, len(links))):
             if globals.cancel_requested:
@@ -307,16 +308,18 @@ async def drm_handler(bot: Client, m: Message):
                 return
   
             Vxy = links[i][1].replace("file/d/","uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing","")
-            # Only add https:// if URL doesn't already have a protocol
+            
+            # Format URL
             if Vxy.startswith(('http://', 'https://')):
                 url = Vxy
                 link0 = Vxy
             else:
                 url = "https://" + Vxy
                 link0 = "https://" + Vxy
-#........................................................................................................................................................................................
-             
+
+            # Process filename
             name1 = links[i][0].replace("(", "[").replace(")", "]").replace("_", "").replace("\t", "").replace(":", "").replace("/", "").replace("+", "").replace("#", "").replace("|", "").replace("@", "").replace("*", "").replace(".", "").replace("https", "").replace("http", "").strip()
+            
             if m.text:
                 if "youtu" in url:
                     try:
@@ -366,7 +369,7 @@ async def drm_handler(bot: Client, m: Message):
                         name = f'{str(count).zfill(3)}) {name1[:60]} {endfilename}'
                         namef = f'{name1[:60]} {endfilename}'
                         
-#........................................................................................................................................................................................
+            # Handle specific platforms
             if "visionias" in url:
                 async with ClientSession() as session:
                     async with session.get(url, headers={'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9', 'Accept-Language': 'en-US,en;q=0.9', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Pragma': 'no-cache', 'Referer': 'http://www.visionias.in/', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Linux; Android 12; RMX2121) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36', 'sec-ch-ua': '"Chromium";v="107", "Not=A?Brand";v="24"', 'sec-ch-ua-mobile': '?1', 'sec-ch-ua-platform': '"Android"',}) as resp:
@@ -377,57 +380,56 @@ async def drm_handler(bot: Client, m: Message):
                 cmd = f'yt-dlp -o "{name}.%(ext)s" -f "bestvideo[height<={raw_text2}]+bestaudio" --hls-prefer-ffmpeg --no-keep-video --remux-video mkv --no-warning "{url}"'
          
             elif "https://cpvod.testbook.com/" in url or "classplusapp.com/drm/" in url:
-    url = url.replace("https://cpvod.testbook.com/", "https://media-cdn.classplusapp.com/drm/")
+                url = url.replace("https://cpvod.testbook.com/", "https://media-cdn.classplusapp.com/drm/")
 
-    try:
-        parts = url.split("/")
-        orgId = parts[3]
+                try:
+                    parts = url.split("/")
+                    orgId = parts[3]
 
-       # Auto-detect contentId safely 
-        contentId = None
-for p in parts:
-    if "-" in p:
-        contentId = p.split("-")[0]
-        break
+                    # Auto-detect contentId safely 
+                    contentId = None
+                    for p in parts:
+                        if "-" in p:
+                            contentId = p.split("-")[0]
+                            break
 
-if not contentId:
-    raise Exception("Unable to extract contentId from URL")
+                    if not contentId:
+                        raise Exception("Unable to extract contentId from URL")
+                            
+                    print(f"[DEBUG] orgId: {orgId}")
+                    print(f"[DEBUG] contentId: {contentId}")
+                    print(f"[DEBUG] original DRM URL: {url}")
 
-        print(f"[DEBUG] orgId: {orgId}")
-        print(f"[DEBUG] contentId: {contentId}")
-        print(f"[DEBUG] original DRM URL: {url}")
+                    sign_api = (
+                        f"https://clasplus-hhdr.vercel.app/api?"
+                        f"orgId={orgId}&contentId={contentId}&url={url}&token={cptoken}"
+                    )
 
-        sign_api = (
-            f"https://clasplus-hhdr.vercel.app/api?"
-            f"orgId={orgId}&contentId={contentId}&url={url}&token={cptoken}"
-        )
+                    print(f"[DEBUG] SIGN API REQUEST: {sign_api}")
 
-        print(f"[DEBUG] SIGN API REQUEST: {sign_api}")
+                    response = requests.get(sign_api)
+                    data = response.json()
 
-        response = requests.get(sign_api)
-        data = response.json()
+                    if data.get("keys") and "url" in data:
+                        mpd = data["url"]
+                        keys = data["keys"]
+                        url = mpd
+                        keys_string = " ".join([f"--key {key}" for key in keys])
+                    else:
+                        raise Exception(data.get("error", "Your Classplus token may be expired."))
 
-        if data.get("keys") and "url" in data:
-            mpd = data["url"]
-            keys = data["keys"]
-            url = mpd
-            keys_string = " ".join([f"--key {key}" for key in keys])
-        else:
-            raise Exception(data.get("error", "Your Classplus token may be expired."))
-
-    except Exception as e:
-        await bot.send_message(
-            channel_id,
-            f'⚠️**Downloading Failed**⚠️\n'
-            f'**Name** =>> `{str(count).zfill(3)} {name1}`\n'
-            f'**Url** =>> {url}\n\n'
-            f'<blockquote expandable><i><b>Failed Reason to sign url: {str(e)}</b></i></blockquote>',
-            disable_web_page_preview=True
-        )
-        count += 1
-        failed_count += 1
-        continue
-                    
+                except Exception as e:
+                    await bot.send_message(
+                        channel_id,
+                        f'⚠️**Downloading Failed**⚠️\n'
+                        f'**Name** =>> `{str(count).zfill(3)} {name1}`\n'
+                        f'**Url** =>> {url}\n\n'
+                        f'<blockquote expandable><i><b>Failed Reason to sign url: {str(e)}</b></i></blockquote>',
+                        disable_web_page_preview=True
+                    )
+                    count += 1
+                    failed_count += 1
+                    continue
                     
             elif "tencdn.classplusapp" in url:
                 try:
@@ -476,7 +478,6 @@ if not contentId:
                 bcov = f'bcov_auth={cwtoken}'
                 url = url.split("bcov_auth")[0]+bcov
 
-            #elif "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
             elif "childId" in url and "parentId" in url:
                 url = f"https://anonymouspwplayer-0e5a3f512dec.herokuapp.com/pw?url={url}&token={pwtoken}"
                                       
@@ -484,6 +485,7 @@ if not contentId:
                 appxkey = url.split('*')[1]
                 url = url.split('*')[0]
 
+            # Set download format
             if "youtu" in url:
                 ytf = f"best[height<={raw_text2}]/bestvideo[height<={raw_text2}]+bestaudio/best"
             elif "embed" in url:
@@ -499,8 +501,9 @@ if not contentId:
                 cmd = f'yt-dlp --cookies youtube_cookies.txt -f "{ytf}" "{url}" -o "{name}.mp4" -R 10 --fragment-retries 10'
             else:
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"'
-#........................................................................................................................................................................................
+
             try:
+                # Prepare captions
                 if m.text:
                     cc = f'[{name1} [{res}p].mkv]({link0})'
                     cc1 = f'[{name1}.pdf]({link0})'
@@ -554,7 +557,8 @@ if not contentId:
                             ccimg = f'<b>{str(count).zfill(3)}.</b> {name1} .jpg'
                             ccm = f'<b>{str(count).zfill(3)}.</b> {name1} .mp3'
                             cchtml = f'<b>{str(count).zfill(3)}.</b> {name1} .html'
-#........................................................................................................................................................................................
+
+                # Progress display
                 remaining_links = len(links) - count
                 progress = (count / len(links)) * 100
                 Show = f"<i><b>Video Downloading</b></i>\n<blockquote><b>{str(count).zfill(3)}) {name1}</b></blockquote>" 
@@ -573,7 +577,8 @@ if not contentId:
                         f"━━━━━━━━━━━━━━━━━━━━━━━━━\n" \
                         f"🛑**Send** /stop **to stop process**\n┃\n" \
                         f"╰━✦𝐁𝐨𝐭 𝐌𝐚𝐝𝐞 𝐁𝐲 ✦ {CREDIT}"
-#........................................................................................................................................................................................           
+           
+                # Handle different download types
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, name)
@@ -587,10 +592,10 @@ if not contentId:
   
                 elif "pdf" in url:
                     if "cwmediabkt99" in url:
-                        max_retries = 15  # Define the maximum number of retries
-                        retry_delay = 4  # Delay between retries in seconds
-                        success = False  # To track whether the download was successful
-                        failure_msgs = []  # To keep track of failure messages
+                        max_retries = 15
+                        retry_delay = 4
+                        success = False
+                        failure_msgs = []
                         
                         for attempt in range(max_retries):
                             try:
@@ -602,12 +607,12 @@ if not contentId:
                                 if response.status_code == 200:
                                     with open(f'{namef}.pdf', 'wb') as file:
                                         file.write(response.content)
-                                    await asyncio.sleep(retry_delay)  # Optional, to prevent spamming
+                                    await asyncio.sleep(retry_delay)
                                     copy = await bot.send_document(chat_id=channel_id, document=f'{namef}.pdf', caption=cc1)
                                     count += 1
                                     os.remove(f'{namef}.pdf')
                                     success = True
-                                    break  # Exit the retry loop if successful
+                                    break
                                 else:
                                     failure_msg = await m.reply_text(f"Attempt {attempt + 1}/{max_retries} failed: {response.status_code} {response.reason}")
                                     failure_msgs.append(failure_msg)
@@ -635,12 +640,10 @@ if not contentId:
            
                 elif any(ext in url for ext in [".jpg", ".jpeg", ".png"]):
                     try:
-                        # Extract extension properly, removing query parameters
-                        url_path = url.split('?')[0]  # Remove query parameters
+                        url_path = url.split('?')[0]
                         ext = url_path.split('.')[-1].lower()
-                        # Ensure extension is valid
                         if ext not in ['jpg', 'jpeg', 'png']:
-                            ext = 'jpg'  # Default to jpg if extension is unclear
+                            ext = 'jpg'
                         
                         cmd = f'yt-dlp -o "{namef}.{ext}" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
@@ -658,12 +661,10 @@ if not contentId:
 
                 elif any(ext in url for ext in [".mp3", ".wav", ".m4a"]):
                     try:
-                        # Extract extension properly, removing query parameters
-                        url_path = url.split('?')[0]  # Remove query parameters
+                        url_path = url.split('?')[0]
                         ext = url_path.split('.')[-1].lower()
-                        # Ensure extension is valid
                         if ext not in ['mp3', 'wav', 'm4a']:
-                            ext = 'mp3'  # Default to mp3 if extension is unclear
+                            ext = 'mp3'
                         
                         cmd = f'yt-dlp -o "{namef}.{ext}" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
@@ -724,7 +725,7 @@ if not contentId:
         await m.reply_text(e)
         time.sleep(2)
 
-    # Calculate success count properly for both single numbers and ranges
+    # Calculate success count
     try:
         if '-' in raw_text:
             start_idx = int(raw_text.split('-')[0].lstrip('0') or '1')
@@ -732,18 +733,20 @@ if not contentId:
             total_processed = min(end_idx, len(links)) - start_idx + 1
             success_count = total_processed - failed_count
         else:
-            # Single number: downloads from index to end (original behavior)
             success_count = len(links) - arg - failed_count + 1
     except:
         success_count = len(links) - failed_count
+        
     video_count = len(links) - pdf_count - img_count
+    
+    # Send completion message
     if m.document:
         await bot.send_message(channel_id, f"<blockquote>🔗 Total URLs: {len(links)} \n┠🔴 Total Failed URLs: {failed_count}\n┠🟢 Total Successful URLs: {success_count}\n┃   ┠🎥 Total Video URLs: {video_count}\n┃   ┠📄 Total PDF URLs: {pdf_count}\n┃   ┠📸 Total IMAGE URLs: {img_count}</blockquote>\n")
         await bot.send_message(channel_id, f"⋅ ─ list index ({raw_text}-{len(links)}) out of range ─ ⋅\n<blockquote><b>📚Batch : {b_name}</b></blockquote>\n⋅ ─ DOWNLOADING ✩ COMPLETED ─ ⋅")
         if "/d" not in raw_text7:
             await bot.send_message(m.chat.id, f"<blockquote><b>✅ Your Task is completed, please check your Set Channel📱</b></blockquote>")
 
-#============================================================================================================
+
 def register_drm_handlers(bot):
     @bot.on_message(filters.private & (filters.document | filters.text))
     async def call_drm_handler(bot: Client, m: Message):
