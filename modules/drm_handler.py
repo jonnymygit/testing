@@ -377,31 +377,57 @@ async def drm_handler(bot: Client, m: Message):
                 cmd = f'yt-dlp -o "{name}.%(ext)s" -f "bestvideo[height<={raw_text2}]+bestaudio" --hls-prefer-ffmpeg --no-keep-video --remux-video mkv --no-warning "{url}"'
          
             elif "https://cpvod.testbook.com/" in url or "classplusapp.com/drm/" in url:
-                url = url.replace("https://cpvod.testbook.com/","https://media-cdn.classplusapp.com/drm/")
-                try:
-                    url = f"https://clasplus-hhdr.vercel.app/api?url={url}&token={cptoken}&auth=4443683167"
-                    response = requests.get(url)
-                    try:
-                        data = response.json()
-                    except Exception as e:
-                        print(f"JSON parsing error at line 374: {e}, Response: {response.text[:200]}")
-                        raise
-                    if data.get("keys") and "url" in data:
-                        mpd = data.get('url')
-                        keys = data.get('keys')
-                        url = mpd
-                        keys_string = " ".join([f"--key {key}" for key in keys])
-                    else:
-                        raise Exception(f"{data.get('error', 'Your Classplus token may be expired.')}")
-                        mpd = None
-                        keys = None
-                        url = None
-                        keys_string = None
-                except Exception as e:
-                    await bot.send_message(channel_id, f'⚠️**Downloading Failed**⚠️\n**Name** =>> `{str(count).zfill(3)} {name1}`\n**Url** =>> {url}\n\n<blockquote expandable><i><b>Failed Reason to sign url: {str(e)}</b></i></blockquote>', disable_web_page_preview=True)
-                    count += 1
-                    failed_count += 1
-                    continue
+    url = url.replace("https://cpvod.testbook.com/", "https://media-cdn.classplusapp.com/drm/")
+
+    try:
+        parts = url.split("/")
+        orgId = parts[3]
+
+       # Auto-detect contentId safely 
+        contentId = None
+for p in parts:
+    if "-" in p:
+        contentId = p.split("-")[0]
+        break
+
+if not contentId:
+    raise Exception("Unable to extract contentId from URL")
+
+        print(f"[DEBUG] orgId: {orgId}")
+        print(f"[DEBUG] contentId: {contentId}")
+        print(f"[DEBUG] original DRM URL: {url}")
+
+        sign_api = (
+            f"https://clasplus-hhdr.vercel.app/api?"
+            f"orgId={orgId}&contentId={contentId}&url={url}&token={cptoken}"
+        )
+
+        print(f"[DEBUG] SIGN API REQUEST: {sign_api}")
+
+        response = requests.get(sign_api)
+        data = response.json()
+
+        if data.get("keys") and "url" in data:
+            mpd = data["url"]
+            keys = data["keys"]
+            url = mpd
+            keys_string = " ".join([f"--key {key}" for key in keys])
+        else:
+            raise Exception(data.get("error", "Your Classplus token may be expired."))
+
+    except Exception as e:
+        await bot.send_message(
+            channel_id,
+            f'⚠️**Downloading Failed**⚠️\n'
+            f'**Name** =>> `{str(count).zfill(3)} {name1}`\n'
+            f'**Url** =>> {url}\n\n'
+            f'<blockquote expandable><i><b>Failed Reason to sign url: {str(e)}</b></i></blockquote>',
+            disable_web_page_preview=True
+        )
+        count += 1
+        failed_count += 1
+        continue
+                    
                     
             elif "tencdn.classplusapp" in url:
                 try:
